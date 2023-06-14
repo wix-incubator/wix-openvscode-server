@@ -109,7 +109,7 @@ export class WebClientServer {
 	) {
 		this._webExtensionResourceUrlTemplate = this._productService.extensionsGallery?.resourceUrlTemplate ? URI.parse(this._productService.extensionsGallery.resourceUrlTemplate) : undefined;
 		const serverRootPath = getRemoteServerRootPath(_productService);
-		this._staticRoute = `${serverRootPath}/static`;
+		this._staticRoute = `${process.env['VSCODE_STATIC_BASE_URL'] || ''}/${serverRootPath}/static`.replace(/\/+/, '/');
 		this._callbackRoute = `${serverRootPath}/callback`;
 		this._webExtensionRoute = `${serverRootPath}/web-extension-resource`;
 	}
@@ -339,18 +339,20 @@ export class WebClientServer {
 			return void res.end('Not found');
 		}
 
+		const defaultCspValue = process.env['VSCODE_STATIC_BASE_URL'] ? `'self' '${new URL(process.env['VSCODE_STATIC_BASE_URL']).origin}'` : `'self'`;
+
 		const cspDirectives = [
-			'default-src \'self\';',
-			'img-src \'self\' https: data: blob:;',
-			'media-src \'self\';',
-			`script-src 'self' 'unsafe-eval' ${this._getScriptCspHashes(data).join(' ')} 'sha256-fh3TwPMflhsEIpR8g1OYTIMVWhXTLcjQ9kh2tIpmv54=' http://${remoteAuthority};`, // the sha is the same as in src/vs/workbench/services/extensions/worker/webWorkerExtensionHostIframe.html
-			'child-src \'self\';',
-			`frame-src 'self' https://*.vscode-cdn.net data:;`,
-			'worker-src \'self\' data:;',
-			'style-src \'self\' \'unsafe-inline\';',
-			'connect-src \'self\' ws: wss: https:;',
-			'font-src \'self\' blob:;',
-			'manifest-src \'self\';'
+			`default-src ${defaultCspValue};`,
+			`img-src ${defaultCspValue} https: data: blob:;`,
+			`media-src ${defaultCspValue};`,
+			`script-src ${defaultCspValue} 'unsafe-eval' ${this._getScriptCspHashes(data).join(' ')} 'sha256-fh3TwPMflhsEIpR8g1OYTIMVWhXTLcjQ9kh2tIpmv54=' http://${remoteAuthority};`, // the sha is the same as in src/vs/workbench/services/extensions/worker/webWorkerExtensionHostIframe.html
+			`child-src ${defaultCspValue};`,
+			`frame-src ${defaultCspValue} https://*.vscode-cdn.net data:;`,
+			`worker-src ${defaultCspValue} data:;`,
+			`style-src ${defaultCspValue} 'unsafe-inline';`,
+			`connect-src ${defaultCspValue} ws: wss: https:;`,
+			`font-src ${defaultCspValue} blob:;`,
+			`manifest-src ${defaultCspValue};`
 		].join(' ');
 
 		const headers: http.OutgoingHttpHeaders = {
