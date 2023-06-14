@@ -1,0 +1,107 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Commit to release'
+        required: true
+      quality:
+        description: 'Quality'
+        required: true
+        type: choice
+        options:
+        - insider
+        - stable
+        default: insider
+      uploadRelease:
+        description: 'Create GitHub Release'
+        type: boolean
+        required: true
+
+env:
+  QUALITY: ${{ github.event.inputs.quality }}
+  RELEASE_COMMIT: ${{ github.event.inputs.commit }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+      env:
+        OS_NAME: 'linux'
+        VSCODE_ARCH: ${{ matrix.vscode_arch }}
+
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+        - vscode_arch: x64
+          npm_arch: x64
+          image: gitpod/openvscode-server-linux-build-agent:bionic-x64
+
+    name: Build linux-${{ matrix.vscode_arch }}
+    outputs:
+      release_commit: ${{ steps.bundle_tar.outputs.release_commit }}
+      version: ${{ steps.bundle_tar.outputs.version }}
+      quality: ${{ steps.bundle_tar.outputs.quality }}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          path: openvscode-server
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+
+      - name: Install Yarn
+        run: npm install -g yarn
+
+      - name: Execute yarn
+        working-directory: ./openvscode-server
+        run: yarn --frozen-lockfile --network-timeout 180000
+
+      - name: Prepare for distribution
+        working-directory: ./openvscode-server
+        run: yarn gulp vscode-reh-web-linux-${{ matrix.vscode_arch }}-min
+
+      - name: Bundle tarfile
+        id: bundle_tar
+        run: |
+          set -e
+          version=$(node -p -e "require('./openvscode-server/package.json').version")
+          release_commit=$(git -C openvscode-server rev-parse "${RELEASE_COMMIT}")
+          quality_name=$([ "$QUALITY" = "insider" ] && echo "-insiders" || echo "")
+          name="openvscode-server${quality_name}-v${version}-linux-${{ matrix.vscode_arch }}"
+          mv vscode-reh-web-linux-${{ matrix.vscode_arch }} ${name}
+          tar -czf ${name}.tar.gz ${name}
+
+          echo "release_commit=${release_commit}" >> $GITHUB_OUTPUT
+          echo "version=${version}" >> $GITHUB_OUTPUT
+          echo "quality=${QUALITY}" >> $GITHUB_OUTPUT
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-${{ matrix.vscode_arch }}
+          path: openvscode-server-*.tar.gz
+
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.uploadRelease == 'true' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts/
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create wix-openvscode-server-v${{ needs.build.outputs.version }} --repo ${{ github.repository }} artifacts/**/openvscode-server-*.tar.gz
+
