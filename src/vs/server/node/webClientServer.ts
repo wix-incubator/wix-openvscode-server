@@ -339,7 +339,7 @@ export class WebClientServer {
 			return void res.end('Not found');
 		}
 
-		const defaultCspValue = process.env['VSCODE_STATIC_BASE_URL'] ? `'self' '${new URL(process.env['VSCODE_STATIC_BASE_URL']).origin}'` : `'self'`;
+		const defaultCspValue = process.env['VSCODE_STATIC_BASE_URL'] ? `'self' ${new URL(process.env['VSCODE_STATIC_BASE_URL']).origin}` : `'self'`;
 
 		const cspDirectives = [
 			`default-src ${defaultCspValue};`,
