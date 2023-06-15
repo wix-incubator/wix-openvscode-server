@@ -103,5 +103,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create wix-openvscode-server-v${{ needs.build.outputs.version }} artifacts/**/openvscode-server-*.tar.gz
+          gh release create wix-openvscode-server-v${{ needs.build.outputs.version }} --repo ${{ github.repository }} artifacts/**/openvscode-server-*.tar.gz
 
