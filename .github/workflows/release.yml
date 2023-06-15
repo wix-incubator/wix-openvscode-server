@@ -99,12 +99,7 @@ jobs:
         with:
           path: artifacts/
 
-      - name: Create stable release
-        uses: softprops/action-gh-release@v1
-        with:
-          repository: ${{ github.repository_owner }}/openvscode-server
-          target_commitish: ${{ needs.build.outputs.release_commit }}
-          body: Wix OpenVSCode Server v${{ needs.build.outputs.version }}
-          tag_name: wix-openvscode-server-v${{ needs.build.outputs.version }}
-          files: artifacts/**/openvscode-server-*.tar.gz
+      - name: Create release
+        run: |
+          gh release create wix-openvscode-server-v${{ needs.build.outputs.version }} artifacts/**/openvscode-server-*.tar.gz
 
